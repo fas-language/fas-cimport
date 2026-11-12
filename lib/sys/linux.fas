@@ -1,0 +1,18 @@
+const SYS_MMAP u64 = 9
+const SYS_OPENAT u64 = 257
+const SYS_READ u64 = 0
+const SYS_CLOSE u64 = 3
+const SYS_FSTAT u64 = 5
+
+const PROT_READ i32 = 1
+const PROT_WRITE i32 = 2
+
+const MAP_PRIVATE i32 = 2
+const MAP_ANONYMOUS i32 = 32
+const MAP_NORESERVE i32 = 0x4000
+
+fn os_reserve(size usize) addr {
+    r i64 = syscall(SYS_MMAP, 0, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0)
+    if r < 0 { return null }
+    return addr_from_bits(bitcast[usize](r))
+}

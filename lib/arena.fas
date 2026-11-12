@@ -1,0 +1,39 @@
+use linux "sys/linux.fas"
+
+struct Arena {
+    base addr
+    used usize
+    capacity usize
+}
+
+fn arena_init(arena addr, capacity usize) bool {
+    base addr = os_reserve(capacity)
+    if base == null { return false }
+
+    arena[Arena].base = base
+    arena[Arena].used = 0
+    arena[Arena].capacity = capacity
+
+    return true
+}
+
+fn arena_alloc(arena addr, size usize, alignment usize) addr {
+    if alignment == 0 { return null }
+    if (alignment & (alignment - 1)) != 0 { return null }
+
+    view a = arena[Arena]
+
+    if a.used > a.capacity { return null }
+
+    current usize = addr_bits(a.base + a.used)
+    padding usize = (alignment - (current & (alignment - 1))) & (alignment - 1)
+
+    remaining usize = a.capacity - a.used
+    if padding > remaining { return null }
+    if size > remaining - padding { return null }
+
+    result addr = a.base + a.used + padding
+    a.used += padding + size
+
+    return result
+}
