@@ -1,0 +1,43 @@
+use linux "sys/linux.fas"
+
+struct File {
+    data addr
+    size usize
+}
+
+fn load_file(arena addr, path addr, alignment usize, padding usize, out addr) bool {
+    out[File].data = null
+    out[File].size = 0
+
+    fd i64 = os_open(path)
+    if fd < 0 { return false }
+    defer { os_close(fd) }
+
+    length i64 = os_file_size(fd)
+    if length < 0 { return false }
+
+    size usize = bitcast[usize](length)
+    if padding > arena[Arena].capacity { return false }
+    if size > arena[Arena].capacity - padding { return false }
+
+    checkpoint usize = arena[Arena].used
+    data addr = arena_alloc(arena, size + padding, alignment)
+    if data == null { return false }
+
+    total usize = 0
+    while total < size {
+        n i64 = os_read(fd, data + total, size - total)
+        if n <= 0 { arena[Arena].used = checkpoint; return false }
+
+        total += bitcast[usize](n)
+    }
+
+    for i usize = 0; i < padding; i += 1 {
+        (data + size)[u8, i] = 0
+    }
+
+    out[File].data = data
+    out[File].size = size
+
+    return true
+}

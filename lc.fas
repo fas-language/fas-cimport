@@ -1,5 +1,5 @@
-use "C" <stdio.h>
-use linux "lib/arena.fas"
+use "lib/arena.fas"
+use "lib/file.fas"
 
 const ARENA_SIZE usize = 4 * 1024 * 1024 * 1024
 const FILE_ALIGN usize = 64
@@ -11,6 +11,11 @@ fn main(argc i32, argv addr) i32 {
     arena Arena = {}
     if !arena_init(&arena, ARENA_SIZE) {
         return 2
+    }
+
+    file File = {}
+    if !load_file(&arena, argv[addr, 1], &file) {
+        return 3
     }
 
     return 0
