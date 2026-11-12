@@ -14,9 +14,20 @@ fn main(argc i32, argv addr) i32 {
     }
 
     file File = {}
-    if !load_file(&arena, argv[addr, 1], &file) {
+    if !load_file(&arena, argv[addr, 1], FILE_ALIGN, FILE_PADDING, &file) {
         return 3
     }
 
-    return 0
+    i usize = 0
+    count u64 = 0
+    mask vec[32, u8] = splat('\n')
+    while i < file.size {
+        values vec[32, u8] = (file.data + i)[vec[32, u8]]
+        result vec[32, bool] = values == mask
+
+        count += popcount(bitcast[u32](result))
+        i += 32
+    }
+
+    return trunc[i32](count)
 }
