@@ -1,33 +1,36 @@
 use linux "sys/linux.fas"
 
+error FileOpenFailed, FileSizeFailed, FileReadFailed, UnexpectedEof
+
 struct File {
     data addr
     size usize
 }
 
-fn load_file(arena addr, path addr, alignment usize, padding usize, out addr) bool {
+fn load_file(arena addr, path addr, alignment usize, padding usize, out addr) fails {
     out[File].data = null
     out[File].size = 0
 
     fd i64 = os_open(path)
-    if fd < 0 { return false }
+    if fd < 0 { fail FileOpenFailed }
     defer { os_close(fd) }
 
     length i64 = os_file_size(fd)
-    if length < 0 { return false }
+    if length < 0 { fail FileSizeFailed }
 
     size usize = bitcast[usize](length)
-    if padding > arena[Arena].capacity { return false }
-    if size > arena[Arena].capacity - padding { return false }
+    if padding > arena[Arena].capacity { fail OutOfMemory }
+    if size > arena[Arena].capacity - padding { fail OutOfMemory }
 
     checkpoint usize = arena[Arena].used
-    data addr = arena_alloc(arena, size + padding, alignment)
-    if data == null { return false }
+    data addr = try arena_alloc(arena, size + padding, alignment)
+    errdefer { arena[Arena].used = checkpoint }
 
     total usize = 0
     while total < size {
         n i64 = os_read(fd, data + total, size - total)
-        if n <= 0 { arena[Arena].used = checkpoint; return false }
+        if n < 0 { fail FileReadFailed }
+        if n == 0 { fail UnexpectedEof }
 
         total += bitcast[usize](n)
     }
@@ -38,6 +41,4 @@ fn load_file(arena addr, path addr, alignment usize, padding usize, out addr) bo
 
     out[File].data = data
     out[File].size = size
-
-    return true
 }
