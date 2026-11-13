@@ -1,0 +1,22 @@
+use linux "sys/linux.fas"
+
+fn write_str(fd i32, str addr) i64 {
+    n usize = 0
+    while str[u8, n] != 0 { n += 1 }
+
+    return os_write(fd, str, n)
+}
+
+fn write_u64(fd i32, value u64) i64 {
+    digits arr[20, u8] = {}
+    i usize = len(digits)
+
+    while true {
+        i -= 1
+        digits[i] = trunc[u8](value % 10) + '0'
+        value /= 10
+        if value == 0 { break }
+    }
+
+    return os_write(fd, &digits + i, len(digits) - i)
+}
