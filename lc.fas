@@ -2,28 +2,20 @@ use "lib/arena.fas"
 use "lib/file.fas"
 use "lib/io.fas"
 
+error Usage
+
 const ARENA_SIZE usize = 4 * 1024 * 1024 * 1024
 const FILE_ALIGN usize = 64
 const FILE_PADDING usize = 64
 
-fn main(argc i32, argv addr) i32 {
-    if argc < 2 { return 1 }
+fn main(argc i32, argv addr) i32 fails {
+    if argc < 2 { fail Usage }
 
     arena Arena = {}
-    arena_init(&arena, ARENA_SIZE) catch e {
-        write_str(2, err_name(e))
-        write_str(2, c"\n")
-        return 2
-    }
+    try arena_init(&arena, ARENA_SIZE)
 
     file File = {}
-    load_file(&arena, argv[addr, 1], FILE_ALIGN, FILE_PADDING, &file) catch e {
-        write_str(2, argv[addr, 1])
-        write_str(2, c": ")
-        write_str(2, err_name(e))
-        write_str(2, c"\n")
-        return 3
-    }
+    try load_file(&arena, argv[addr, 1], FILE_ALIGN, FILE_PADDING, &file)
 
     i usize = 0
     count u64 = 0
