@@ -1,12 +1,8 @@
+const SYS_READ u64 = 0
+const SYS_WRITE u64 = 1
+const SYS_CLOSE u64 = 3
 const SYS_MMAP u64 = 9
 const SYS_OPENAT u64 = 257
-const SYS_READ u64 = 0
-const SYS_CLOSE u64 = 3
-const SYS_FSTAT u64 = 5
-const SYS_WRITE u64 = 1
-
-const EINTR i64 = 4
-const EIO i64 = 5
 
 const PROT_READ i32 = 1
 const PROT_WRITE i32 = 2
@@ -17,37 +13,31 @@ const MAP_NORESERVE i32 = 0x4000
 
 const AT_FDCWD i32 = -100
 
+const O_RDONLY i32 = 0
+const O_CLOEXEC i32 = 0x80000
+
 error Interrupted = 4, IoError = 5
 
-fn os_reserve(size usize) addr {
-    r i64 = syscall(SYS_MMAP, 0, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0)
-    if r < 0 { return null }
-    return addr_from_bits(bitcast[usize](r))
+fn os_reserve(size usize) addr fails {
+    return try syscall[addr fails](SYS_MMAP, 0, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0)
 }
 
-fn os_open(path addr) i64 {
-    return syscall(SYS_OPENAT, AT_FDCWD, path, 0, 0)
+fn os_open(path addr) i32 fails {
+    return trunc[i32](try syscall[fails](SYS_OPENAT, AT_FDCWD, path, O_RDONLY | O_CLOEXEC, 0))
 }
 
-fn os_read(fd i64, dst addr, size usize) i64 {
+fn os_read(fd i32, destination addr, size usize) usize fails {
     while true {
-        n i64 = syscall(SYS_READ, fd, dst, size)
-        if n != -4 { return n }
+        read u64 = syscall[u64 fails](SYS_READ, fd, destination, size) catch e {
+            if e == Interrupted { continue }
+            fail e
+        }
+        return read
     }
 }
 
 fn os_close(fd i64) void {
     syscall(SYS_CLOSE, fd)
-}
-
-fn os_file_size(fd i64) i64 {
-    // stat struct -> https://github.com/torvalds/linux/blob/master/arch/x86/include/uapi/asm/stat.h
-    stat arr[144, u8] = {}
-    if syscall(SYS_FSTAT, fd, &stat) < 0 {
-       return -1
-    }
-    // offset 48 is st_size
-    return (&stat + 48)[i64]
 }
 
 fn os_write(fd i32, data addr, size usize) fails {

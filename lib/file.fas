@@ -1,44 +1,34 @@
 use linux "sys/linux.fas"
 
-error FileOpenFailed, FileSizeFailed, FileReadFailed, UnexpectedEof
-
-struct File {
+value struct File {
     data addr
     size usize
 }
 
-fn load_file(arena addr, path addr, alignment usize, padding usize, out addr) fails {
-    out[File].data = null
-    out[File].size = 0
-
-    fd i64 = os_open(path)
-    if fd < 0 { fail FileOpenFailed }
+fn load_file[ALIGNMENT const usize](arena addr, path addr, padding usize) File fails {
+    fd i32 = try os_open(path)
     defer { os_close(fd) }
 
-    length i64 = os_file_size(fd)
-    if length < 0 { fail FileSizeFailed }
-
-    size usize = bitcast[usize](length)
-    if padding > arena[Arena].capacity { fail OutOfMemory }
-    if size > arena[Arena].capacity - padding { fail OutOfMemory }
-
     checkpoint usize = arena[Arena].used
-    data addr = try arena_alloc(arena, size + padding, alignment)
     errdefer { arena[Arena].used = checkpoint }
 
-    total usize = 0
-    while total < size {
-        n i64 = os_read(fd, data + total, size - total)
-        if n < 0 { fail FileReadFailed }
-        if n == 0 { fail UnexpectedEof }
+    data addr = try arena_alloc[ALIGNMENT](arena, 0)
+    available usize = arena_remaining(arena)
+    if available < padding { fail OutOfMemory }
+    available -= padding
 
-        total += bitcast[usize](n)
+    size usize = 0
+    while true {
+        if size == available { fail OutOfMemory }
+        read usize = try os_read(fd, data + size, available - size)
+        if read == 0 { break }
+        size += read
     }
 
+    try arena_alloc[1](arena, size + padding)
     for i usize = 0; i < padding; i += 1 {
         (data + size)[u8, i] = 0
     }
 
-    out[File].data = data
-    out[File].size = size
+    return { data, size }
 }

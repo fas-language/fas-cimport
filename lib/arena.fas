@@ -9,30 +9,28 @@ struct Arena {
 }
 
 fn arena_init(arena addr, capacity usize) fails {
-    base addr = os_reserve(capacity)
-    if base == null { fail OutOfMemory }
-
-    arena[Arena].base = base
+    arena[Arena].base = try os_reserve(capacity)
     arena[Arena].used = 0
     arena[Arena].capacity = capacity
 }
 
-fn arena_alloc(arena addr, size usize, alignment usize) addr fails {
-    if alignment == 0 || (alignment & (alignment - 1)) != 0 { fail BadAlignment }
+fn arena_alloc[ALIGNMENT const usize](arena addr, size usize) addr fails {
+    if ALIGNMENT == 0 || (ALIGNMENT & (ALIGNMENT - 1)) != 0 { fail BadAlignment }
 
     view a = arena[Arena]
 
-    if a.used > a.capacity { fail OutOfMemory }
-
     current usize = addr_bits(a.base + a.used)
-    padding usize = (alignment - (current & (alignment - 1))) & (alignment - 1)
+    padding usize = (ALIGNMENT - (current & (ALIGNMENT - 1))) & (ALIGNMENT - 1)
 
     remaining usize = a.capacity - a.used
-    if padding > remaining { fail OutOfMemory }
-    if size > remaining - padding { fail OutOfMemory }
+    if padding > remaining || size > remaining - padding { fail OutOfMemory }
 
     result addr = a.base + a.used + padding
     a.used += padding + size
 
     return result
+}
+
+fn arena_remaining(arena addr) usize {
+    return arena[Arena].capacity - arena[Arena].used
 }
