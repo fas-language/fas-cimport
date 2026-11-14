@@ -4,7 +4,7 @@ const READ_PADDING usize = 64
 
 struct Reader {
     fd i32
-    buffer addr                                 // capacity + READ_PADDING bytes
+    buffer addr // capacity + READ_PADDING bytes
     capacity usize
 }
 
