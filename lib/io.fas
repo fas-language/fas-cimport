@@ -1,13 +1,56 @@
 use linux "sys/linux.fas"
 
-fn write_str(fd i32, str addr) i64 {
-    n usize = 0
-    while str[u8, n] != 0 { n += 1 }
-
-    return os_write(fd, str, n)
+struct Writer {
+    fd i32
+    buffer addr
+    capacity usize
+    used usize
+    err error
 }
 
-fn write_u64(fd i32, value u64) i64 {
+fn writer_flush(writer addr) fails {
+    view w = writer[Writer]
+    if bitcast[u32](w.err) != 0 { fail w.err }
+
+    os_write(w.fd, w.buffer, w.used) catch e {
+        w.err = e
+        fail e
+    }
+
+    w.used = 0
+}
+
+fn put_bytes(writer addr, data addr, size usize) void {
+    view w = writer[Writer]
+
+    if size > w.capacity - w.used {
+        writer_flush(writer) catch { return }
+        // too big too bufer, write directly
+        if size >= w.capacity {
+            os_write(w.fd, data, size) catch e { w.err = e }
+            return
+        }
+    }
+
+    for i usize = 0; i < size; i += 1 {
+        (w.buffer + w.used)[u8, i] = data[u8, i]
+    }
+    w.used += size
+}
+
+fn put_byte(writer addr, byte u8) void {
+    view w = writer[Writer]
+
+    if w.used >= w.capacity {
+        put_bytes(writer, &byte, 1)
+        return
+    }
+
+    w.buffer[u8, w.used] = byte
+    w.used += 1
+}
+
+fn put_u64(writer addr, value u64) void {
     digits arr[20, u8] = {}
     i usize = len(digits)
 
@@ -18,5 +61,5 @@ fn write_u64(fd i32, value u64) i64 {
         if value == 0 { break }
     }
 
-    return os_write(fd, &digits + i, len(digits) - i)
+    put_bytes(writer, &digits + i, len(digits) - i)
 }

@@ -17,6 +17,8 @@ const MAP_NORESERVE i32 = 0x4000
 
 const AT_FDCWD i32 = -100
 
+error Interrupted = 4, IoError = 5
+
 fn os_reserve(size usize) addr {
     r i64 = syscall(SYS_MMAP, 0, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0)
     if r < 0 { return null }
@@ -48,16 +50,18 @@ fn os_file_size(fd i64) i64 {
     return (&stat + 48)[i64]
 }
 
-fn os_write(fd i32, p addr, n usize) i64 {
+fn os_write(fd i32, data addr, size usize) fails {
     done usize = 0
 
-    while done < n {
-        r i64 = syscall(SYS_WRITE, fd, p + done, n - done)
-        if r == -EINTR { continue }
-        if r < 0 { return r }
-        if r == 0 { return -EIO }
-        done += bitcast[usize](r)
+    while done < size {
+
+        written u64 = syscall[u64 fails](SYS_WRITE, fd, data + done, size - done) catch e {
+            if e == Interrupted { continue }
+            fail e
+        }
+
+        if written == 0 { fail IoError }
+        done += bitcast[usize](written)
     }
 
-    return bitcast[i64](done)
 }
