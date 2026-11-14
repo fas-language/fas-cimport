@@ -1,40 +1,47 @@
-use "lib/arena.fas"
-use "lib/file.fas"
+use linux "lib/sys/linux.fas"
 use "lib/io.fas"
 
 error Usage
 
-const ARENA_SIZE usize = 4 * 1024 * 1024 * 1024
-const FILE_ALIGN usize = 64
-const FILE_PADDING usize = 64
+const CHUNK_SIZE usize = 128 * 1024
+
+fn count_newlines(chunk Chunk) u64 {
+    count u64 = 0
+    newline vec[32, u8] = splat('\n')
+    for i usize = 0; i < chunk.size; i += 32 {
+        values vec[32, u8] = (chunk.data + i)[vec[32, u8]]
+        matches vec[32, bool] = values == newline
+        count += popcount(bitcast[u32](matches))
+    }
+    return count
+}
 
 fn main(argc i32, argv addr) i32 fails {
     if argc < 2 { fail Usage }
 
-    arena Arena = {}
-    try arena_init(&arena, ARENA_SIZE)
-
-    newlines u64 = 0
+    lines u64 = 0
     bytes u64 = 0
 
     for i i32 = 1; i < argc; i += 1 {
-        file File = try load_file[FILE_ALIGN](&arena, argv[addr, i], FILE_PADDING)
+        fd i32 = try os_open(argv[addr, i])
+        defer { os_close(fd) }
 
-        mask vec[32, u8] = splat('\n')
+        buffer ReadBuffer[CHUNK_SIZE]
+        input Reader = {.fd = fd, .buffer = &buffer, .capacity = CHUNK_SIZE}
 
-        for i usize = 0; i < file.size; i += 32 {
-            values vec[32, u8] = (file.data + i)[vec[32, u8]]
-            result vec[32, bool] = values == mask
-            newlines += popcount(bitcast[u32](result))
+        while true {
+            chunk Chunk = try reader_next(&input)
+            if chunk.size == 0 { break }
+            lines += count_newlines(chunk)
+            bytes += chunk.size
         }
 
-        bytes += file.size
     }
 
-    buffer arr[64, u8] = {}
+    buffer arr[64, u8]
     output Writer = { .fd = 1, .buffer = &buffer, .capacity = len(buffer) }
 
-    put_u64(&output, newlines)
+    put_u64(&output, lines)
     put_byte(&output, ' ')
     put_u64(&output, bytes)
     put_byte(&output, '\n')

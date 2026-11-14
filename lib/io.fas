@@ -1,5 +1,31 @@
 use linux "sys/linux.fas"
 
+const READ_PADDING usize = 64
+
+struct Reader {
+    fd i32
+    buffer addr                                 // capacity + READ_PADDING bytes
+    capacity usize
+}
+
+value struct Chunk {
+    data addr
+    size usize
+}
+
+struct ReadBuffer[N const usize] @align(64) {
+    bytes arr[N + READ_PADDING, u8]
+}
+
+fn reader_next(reader addr) Chunk fails {
+    view r = reader[Reader]
+
+    size usize = try os_read(r.fd, r.buffer, r.capacity)
+    (r.buffer + size)[vec[64, u8]] = splat(0)
+
+    return {r.buffer, size}
+}
+
 struct Writer {
     fd i32
     buffer addr
