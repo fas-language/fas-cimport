@@ -89,3 +89,9 @@ fn put_u64(writer addr, value u64) void {
 
     put_bytes(writer, &digits + i, len(digits) - i)
 }
+
+fn put_str(writer addr, str addr) void {
+    size usize = 0
+    while str[u8, size] != 0 { size += 1 }
+    put_bytes(writer, str, size)
+}

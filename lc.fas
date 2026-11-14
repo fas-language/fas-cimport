@@ -19,14 +19,24 @@ fn count_newlines(chunk Chunk) u64 {
 fn main(argc i32, argv addr) i32 fails {
     if argc < 2 { fail Usage }
 
+    buffer ReadBuffer[CHUNK_SIZE]
+    error_buffer arr[256, u8]
+    errors Writer = {.fd = 2, .buffer = &error_buffer, .capacity = len(error_buffer)}
+
     lines u64 = 0
     bytes u64 = 0
 
     for i i32 = 1; i < argc; i += 1 {
-        fd i32 = try os_open(argv[addr, i])
+        path addr = argv[addr, i]
+        errdefer {
+            put_str(&errors, path)
+            put_str(&errors, c": ")
+            writer_flush(&errors) catch {}
+        }
+
+        fd i32 = try os_open(path)
         defer { os_close(fd) }
 
-        buffer ReadBuffer[CHUNK_SIZE]
         input Reader = {.fd = fd, .buffer = &buffer, .capacity = CHUNK_SIZE}
 
         while true {
@@ -38,8 +48,8 @@ fn main(argc i32, argv addr) i32 fails {
 
     }
 
-    buffer arr[64, u8]
-    output Writer = { .fd = 1, .buffer = &buffer, .capacity = len(buffer) }
+    output_buffer arr[64, u8]
+    output Writer = { .fd = 1, .buffer = &output_buffer, .capacity = len(output_buffer) }
 
     put_u64(&output, lines)
     put_byte(&output, ' ')

@@ -16,7 +16,7 @@ const AT_FDCWD i32 = -100
 const O_RDONLY i32 = 0
 const O_CLOEXEC i32 = 0x80000
 
-error Interrupted = 4, IoError = 5
+error Interrupted = 4, IoError = 5, NotFound = 2
 
 fn os_reserve(size usize) addr fails {
     return try syscall[addr fails](SYS_MMAP, 0, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0)
