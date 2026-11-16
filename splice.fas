@@ -1,0 +1,75 @@
+use linux "lib/sys/linux.fas"
+use "lib/io.fas"
+
+error Usage
+
+const CHUNK_SIZE usize = 128 * 1024
+
+fn count_newlines(chunk Chunk, prev_bs addr) u64 {
+    count u64 = 0
+    carry u32 = prev_bs[u32]
+
+    newline vec[32, u8] = splat('\n')
+    backslash vec[32, u8] = splat('\\')
+
+    for i usize = 0; i < chunk.size; i += 32 {
+        values vec[32, u8] = (chunk.data + i)[vec[32, u8]]
+
+        nl u32 = bitcast[u32](values == newline)
+        bs u32 = bitcast[u32](values == backslash)
+
+        count += popcount(nl & ~((bs << 1) | carry))
+        carry = bs >> 31
+    }
+
+    if chunk.size != 0 {
+        prev_bs[u32] = if chunk.data[u8, chunk.size - 1] == '\\' { 1 } else { 0 }
+    }
+
+    return count
+}
+
+fn main(argc i32, argv addr) i32 fails {
+    if argc < 2 { fail Usage }
+
+    buffer ReadBuffer[CHUNK_SIZE]
+    error_buffer arr[256, u8]
+    errors Writer = {.fd = 2, .buffer = &error_buffer, .capacity = len(error_buffer)}
+
+    lines u64 = 0
+    bytes u64 = 0
+
+    for i i32 = 1; i < argc; i += 1 {
+        path addr = argv[addr, i]
+        errdefer {
+            put_str(&errors, path)
+            put_str(&errors, c": ")
+            writer_flush(&errors) catch {}
+        }
+
+        fd i32 = try os_open(path)
+        defer { os_close(fd) }
+
+        input Reader = {.fd = fd, .buffer = &buffer, .capacity = CHUNK_SIZE}
+        prev_backslash u32 = 0
+
+        while true {
+            chunk Chunk = try reader_next(&input)
+            if chunk.size == 0 { break }
+            lines += count_newlines(chunk, &prev_backslash)
+            bytes += chunk.size
+        }
+
+    }
+
+    output_buffer arr[64, u8]
+    output Writer = { .fd = 1, .buffer = &output_buffer, .capacity = len(output_buffer) }
+
+    put_u64(&output, lines)
+    put_byte(&output, ' ')
+    put_u64(&output, bytes)
+    put_byte(&output, '\n')
+
+    try writer_flush(&output)
+    return 0
+}
